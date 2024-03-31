@@ -1,0 +1,13 @@
+'BOOSTING'
+
+'MIL'
+
+'KCF'
+
+'TLD'
+
+'MEDIANFLOW'
+
+'MOSSE'
+
+'CSRT'

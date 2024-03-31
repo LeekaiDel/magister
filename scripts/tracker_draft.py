@@ -4,6 +4,8 @@ import cv2
 import time
 import threading
 import numpy as np 
+import os
+import time
 
 class HighlightColor():
     def __init__(self):
@@ -12,9 +14,12 @@ class HighlightColor():
         # Global variables
         self.tracker_type = self.tracker_types[6]
         self.tracker = None
+        self.iter_duration = -1
         # Params
-        self.bbox = (0, 0, 100, 100)
-        self.file_name = "../samples/draft.mp4"
+        self.bbox = (356, 15, 182, 87)
+        self.file_name = "../../samples/draft.mp4"
+        self.frame_count = -1
+        self.current_frame = 0
         self.fps = 25
         # Imgs
         self.img_raw = None
@@ -73,7 +78,10 @@ class HighlightColor():
         if(cap.isOpened() == False):
             print("Kurwa!")
             return
-        
+
+        self.frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))   # Находим количество кадров во всем файле
+        print("Количество кадров в файле: ", self.frame_count)
+
         # Читаем первый кадр
         self.frame_ok, self.img_raw = cap.read()
 
@@ -81,6 +89,7 @@ class HighlightColor():
             # Читаем новые кадры только если включен плей
             if self.play_state:
                 self.frame_ok, self.img_raw = cap.read()
+                self.current_frame += 1
 
             if self.frame_ok: 
                 self.img_result = cv2.cvtColor(self.img_raw, cv2.COLOR_BGR2GRAY)
@@ -88,27 +97,37 @@ class HighlightColor():
 
             if self.img_result is not None:
                 img_result = cv2.blur(self.img_result, (3, 3))   
-                ret, img_result = cv2.threshold(img_result, self.min_th, 255, cv2.THRESH_BINARY)
+                ret, img_result = cv2.threshold(img_result, 124, 255, cv2.THRESH_BINARY) #self.min_th
                 # Увеличиваем контуры белых объектов (Делаем противоположность функции erode) - делаем две итерации
                 maskDi = cv2.dilate(img_result, None, iterations=1)
                 maskEr = cv2.erode(maskDi, None, iterations=1)
 
                 self.img_result = cv2.cvtColor(maskEr, cv2.COLOR_GRAY2RGB)
 
-                self.tracker_ok, self.bbox = self.tracker.update(self.img_result)
-                # Draw bounding box
                 if self.tracker_ok:
-                    # Tracking success
-                    p1 = (int(self.bbox[0]), int(self.bbox[1]))
-                    p2 = (int(self.bbox[0] + self.bbox[2]), int(self.bbox[1] + self.bbox[3]))
-                    cv2.rectangle(self.img_result, p1, p2, (255, 0, 0), 2, 1)
-                else :
-                    # Tracking failure
-                    cv2.putText(self.img_result, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0, 0, 255), 2)
- 
+                    start_t = time.time()
+                    tracker_ok, self.bbox = self.tracker.update(self.img_result)
+                    self.iter_duration = time.time() - start_t
+                    # Draw bounding box
+                    if tracker_ok:
+                        # Tracking success
+                        p1 = (int(self.bbox[0]), int(self.bbox[1]))
+                        p2 = (int(self.bbox[0] + self.bbox[2]), int(self.bbox[1] + self.bbox[3]))
+                        cv2.rectangle(self.img_result, p1, p2, (255, 0, 0), 2, 1)
+                    else :
+                        # Tracking failure
+                        cv2.putText(self.img_result, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0, 0, 255), 2)
+                        print("Object Lost!   >> ", self.current_frame, "/", self.frame_count, "|", int((self.current_frame / self.frame_count) * 100))
+                        return
+
                 # self.findBBox(maskEr)
 
                 cv2.imshow('result', self.img_result)
+
+            os.system("clear    ")
+            print("Duration iter  >>", round(self.iter_duration, 2), "c")
+            print("Percent point  >> ", int((self.current_frame / self.frame_count) * 100), "%", "/", 100, "%" )
+            print("Frame point    >> ", self.current_frame, "/", self.frame_count )
 
             if cv2.waitKey(1) == 27: 
                 break
@@ -131,7 +150,7 @@ class HighlightColor():
 
 
     def setBboxCb(self, i, j):
-        self.bbox = cv2.selectROI(self.img_result, False)
+        # self.bbox = cv2.selectROI(self.img_result, False)
         self.tracker_ok = self.tracker.init(self.img_result, self.bbox)
         print("self.tracker_ok ", self.tracker_ok)
 
