@@ -7,17 +7,22 @@ import numpy as np
 import os
 import time
 
+index = 6
+trsh = 110
+write_dataset = False
+
 class HighlightColor():
     def __init__(self):
         self.tracker_types = ['BOOSTING', 'MIL','KCF', 'TLD', 'MEDIANFLOW', 'MOSSE', 'CSRT'] #   , 'GOTURN'
         
         # Global variables
-        self.tracker_type = self.tracker_types[6]
+        self.tracker_type = self.tracker_types[index]
         self.tracker = None
         self.iter_duration = -1
         # Params
         self.bbox = (356, 15, 182, 87)
         self.file_name = "../../samples/draft.mp4"
+        self.dir_for_dataset = "../../dataset_1/"
         self.frame_count = -1
         self.current_frame = 0
         self.fps = 25
@@ -90,14 +95,17 @@ class HighlightColor():
             if self.play_state:
                 self.frame_ok, self.img_raw = cap.read()
                 self.current_frame += 1
+                # Записать датасет из отдельных кадров
+                if(write_dataset):
+                    cv2.imwrite(self.dir_for_dataset + "frame_%d.jpg" % self.current_frame, self.img_raw)
 
             if self.frame_ok: 
                 self.img_result = cv2.cvtColor(self.img_raw, cv2.COLOR_BGR2GRAY)
-                cv2.imshow('Raw', self.img_result)
+                # cv2.imshow('Raw', self.img_result)
 
             if self.img_result is not None:
-                img_result = cv2.blur(self.img_result, (3, 3))   
-                ret, img_result = cv2.threshold(img_result, 124, 255, cv2.THRESH_BINARY) #self.min_th
+                img_result = cv2.blur(self.img_result, (3, 3))                                          
+                ret, img_result = cv2.threshold(img_result, trsh, 255, cv2.THRESH_BINARY) #self.min_th   // 100, 120, 140 // эталон: 124
                 # Увеличиваем контуры белых объектов (Делаем противоположность функции erode) - делаем две итерации
                 maskDi = cv2.dilate(img_result, None, iterations=1)
                 maskEr = cv2.erode(maskDi, None, iterations=1)
@@ -118,7 +126,7 @@ class HighlightColor():
                         # Tracking failure
                         cv2.putText(self.img_result, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0, 0, 255), 2)
                         print("Object Lost!   >> ", self.current_frame, "/", self.frame_count, "|", int((self.current_frame / self.frame_count) * 100))
-                        return
+                        # return
 
                 # self.findBBox(maskEr)
 
