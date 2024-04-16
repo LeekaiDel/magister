@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-file_list_all=os.listdir("/home/user/Documents/polarization/new_project_11_2021/main/my_edit_code/data/")
+file_list_all=os.listdir("D:\\2024\\теплак_дрон\\img\\")
 file_list = []
 for i in file_list_all:
    if i.endswith('.txt'):
@@ -9,6 +9,12 @@ for i in file_list_all:
 
 all_bbox = np.array([])
 for i in range(len(file_list)):
-    path = ("/home/user/Documents/polarization/new_project_11_2021/main/my_edit_code/data/" + file_list[i]) 
-    data = np.genfromtxt(path, delimiter=" ").as_type('int')# там инт или флоат?
-    all_bbox = np.append(all_bbox, data)
+    path = ("D:\\2024\\теплак_дрон\\img\\" + file_list[i]) 
+    data = np.genfromtxt(path, delimiter=" ").astype('float')
+    if data.shape[0] != 0:
+       data = np.append(data, i)
+       all_bbox = np.append(all_bbox, data)
+ 
+
+  
+all_bbox = all_bbox.reshape((all_bbox.shape[0]//6, 6))

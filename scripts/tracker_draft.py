@@ -6,9 +6,10 @@ import threading
 import numpy as np 
 import os
 import time
+import matplotlib.pyplot as plt
 
 index = 6
-trsh = 110
+trsh = 92
 write_dataset = False
 
 class HighlightColor():

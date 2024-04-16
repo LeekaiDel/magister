@@ -1,11 +1,11 @@
 import cv2
 
-name = 5
+name = "a"
 
 class FrameBreaker():
     def __init__(self):
-        self.file_name = "../../TP_Videos/%d.mp4" % name
-        self.dir_for_dataset = "../../plane_%d/" % name
+        self.file_name = "../../TP_Videos/b.mp4"
+        self.dir_for_dataset = "../../plane_2/"
         self.current_frame = 0
         self.img_raw = None
 
@@ -22,7 +22,7 @@ class FrameBreaker():
             img_result = cv2.cvtColor(self.img_raw, cv2.COLOR_BGR2GRAY)
             cv2.imshow('result', img_result)
             cv2.imwrite(self.dir_for_dataset + "%d.jpg" % self.current_frame, img_result)
-
+            print("Frame: ", self.current_frame)
             if cv2.waitKey(1) == 27: 
                 break
 
