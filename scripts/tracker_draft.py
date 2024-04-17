@@ -8,6 +8,8 @@ import os
 import time
 import matplotlib.pyplot as plt
 
+from parser_bbox import getListBboxes 
+
 index = 6
 trsh = 92
 write_dataset = False
@@ -50,9 +52,6 @@ class HighlightColor():
         cv2.createButton('Stop', self.stop_cb)
         cv2.createButton('Set BBox', self.setBboxCb)
         cv2.createButton('Track', self.track_cb)
-
-        # self.get_frame_thread = threading.Thread(target = self.getBBox, args = (), daemon = True)
-        # self.get_frame_thread.start()    
 
         # Главный цикл
         # cap = cv2.VideoCapture("/dev/video0")    #stereo elp >> /dev/video2, /dev/video4
