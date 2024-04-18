@@ -11,6 +11,7 @@ import numpy as np
 import os
 import time
 import matplotlib.pyplot as plt
+import math
 
 from parser_bbox import getListBboxes 
 
@@ -25,6 +26,18 @@ fr_width   = 640             # fr - frame
 fr_height  = 512
 fps_control = False
 
+class Point2D:
+    def __init__(self, x: int = 0, y: int = 0):
+        self.x = x
+        self.y = y
+
+    def __sub__(self, other):
+        return Point2D(self.x - other.x, self.y - other.y)
+
+    def module(self):
+        return int(math.sqrt(pow(self.x, 2) + pow(self.y, 2))) 
+
+
 def drawTarget(img, target_point: tuple, f_yellow: int):  
     cv2.ellipse(img, 
             center=target_point, 
@@ -37,10 +50,13 @@ def drawTarget(img, target_point: tuple, f_yellow: int):
 
 
 def drawTargetBBox(img, bbox_array, bb_number: int):
-    target_x = int(fr_width * (bbox_array[bb_number][1]) )   #  + bbox_array[bb_number][3] / 2)
-    target_y = int(fr_height * (bbox_array[bb_number][2]) )  # + bbox_array[bb_number][4] / 2)
-    # print("id: ", bb_number, " ", target_x, "/", target_y)
-    drawTarget(img, (target_x, target_y), 0)
+    manual_target = Point2D(
+        int(fr_width * (bbox_array[bb_number][1])),   #  + bbox_array[bb_number][3] / 2)
+        int(fr_height * (bbox_array[bb_number][2]))  # + bbox_array[bb_number][4] / 2)
+    )
+    drawTarget(img, (manual_target.x, manual_target.y), 0)
+    return manual_target
+    
 
 class HighlightColor():
     def __init__(self):
@@ -142,26 +158,32 @@ class HighlightColor():
                         update_ok, self.start_bbox = self.tracker.update(self.img_result)
                         self.iter_duration = time.time() - start_t
 
-                        # Draw bounding box
+                        tracker_target = Point2D(0, 0)
                         if update_ok:
                             # Tracking success
-                            p1 = (int(self.start_bbox[0]), int(self.start_bbox[1]))
-                            p2 = (int(self.start_bbox[0] + self.start_bbox[2]), int(self.start_bbox[1] + self.start_bbox[3]))
+                            tracker_target.x = int(self.start_bbox[0]) + int(self.start_bbox[2] // 2)
+                            tracker_target.y = int(self.start_bbox[1]) + int(self.start_bbox[3] // 2)
 
-                            tracker_x = int(self.start_bbox[0]) + int(self.start_bbox[2] // 2) 
-                            tracker_y = int(self.start_bbox[1]) + int(self.start_bbox[3] // 2)
+                            # Рисуем таргет от трекера
+                            drawTarget(self.img_result, (tracker_target.x, tracker_target.y), 1)
 
-                            cv2.rectangle(self.img_result, p1, p2, (255, 0, 0), 2, 1)
-                            drawTarget(self.img_result, (tracker_x, tracker_y), 1)
-
-                            if(self.current_frame < self.bbox_arr.shape[0]):
-                                drawTargetBBox(self.img_result, self.bbox_arr, self.current_frame)  
-
-
+                            # p1 = (int(self.start_bbox[0]), int(self.start_bbox[1]))
+                            # p2 = (int(self.start_bbox[0] + self.start_bbox[2]), int(self.start_bbox[1] + self.start_bbox[3]))
+                            # cv2.rectangle(self.img_result, p1, p2, (255, 0, 0), 2, 1)
                         else :
                             # Tracking failure
                             cv2.putText(self.img_result, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0, 0, 255), 2)
-                            # print("Object Lost!   >> ", self.current_frame, "/", self.frame_count, "|", int((self.current_frame / self.frame_count) * 100))
+                            tracker_target.x = 0
+                            tracker_target.y = 0
+
+                        # Рисуем таргет по разметке
+                        manual_target = Point2D(0, 0)
+                        if(self.current_frame < self.bbox_arr.shape[0]):
+                            manual_target = drawTargetBBox(self.img_result, self.bbox_arr, self.current_frame)  
+
+                        r = (tracker_target - manual_target).module()
+                        print("r = ", r)
+
                     else:
                         self.tracker_init = self.tracker.init(self.img_result, self.start_bbox)
 
@@ -184,7 +206,6 @@ class HighlightColor():
         # self.tracker_init = self.tracker.init(self.img_result, self.start_bbox)
         print("self.tracker_init ", self.tracker_init)
 
-    # Эта функция ничего не делает (Логично блять)
     def min_th_cb(self, x):
         self.min_th = x
 
