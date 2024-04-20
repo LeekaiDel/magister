@@ -19,8 +19,8 @@ from parser_bbox import getListBboxes
 bb_path = "../marks/tp_drone_x4"                # bb - bounding box
 add_prefix = "frame_"
 # Настройки трекера и трешолда
-index = 0
-trsh = 92                   # trsh - treshold
+index = 6
+trsh = 98                   # trsh - treshold
 # Настройки видео
 fr_width   = 640             # fr - frame
 fr_height  = 512
@@ -134,6 +134,8 @@ class HighlightColor():
         # Читаем первый кадр
         self.frame_ok, self.img_raw = cap.read()
 
+        divergence_list = [0 for i in range(self.frame_count)]
+
         while(True):
             # Читаем новые кадры только если включен плей
             if self.play_state:
@@ -182,7 +184,7 @@ class HighlightColor():
                             manual_target = drawTargetBBox(self.img_result, self.bbox_arr, self.current_frame)  
 
                         r = (tracker_target - manual_target).module()
-                        print("r = ", r)
+                        divergence_list[self.current_frame] = r
 
                     else:
                         self.tracker_init = self.tracker.init(self.img_result, self.start_bbox)
@@ -199,6 +201,12 @@ class HighlightColor():
             if(fps_control):
                 time.sleep(1 / self.fps)
 
+        print("r = ", divergence_list)
+        # plt.plot(range(self.frame_count), divergence_list)
+        # plt.stem(range(self.frame_count), divergence_list, use_line_collection = True)
+        plt.bar(range(self.frame_count), divergence_list)
+        plt.grid()
+        plt.show()
 
 
     def setBboxCb(self, i, j):
