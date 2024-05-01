@@ -58,6 +58,15 @@ def drawTargetBBox(img, bbox_array, bb_number: int):
     return manual_target
     
 
+# Rolling 1D window for ND array
+def roll(a,      # ND array
+         b,      # rolling 1D window array
+         dx=1):  # step size (horizontal)
+    shape = a.shape[:-1] + (int((a.shape[-1] - b.shape[-1]) / dx) + 1,) + b.shape
+    strides = a.strides[:-1] + (a.strides[-1] * dx,) + a.strides[-1:]
+    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
+
+
 class HighlightColor():
     def __init__(self):
         self.tracker_types = ['BOOSTING', 'MIL','KCF', 'TLD', 'MEDIANFLOW', 'MOSSE', 'CSRT'] #   , 'GOTURN'
@@ -134,9 +143,13 @@ class HighlightColor():
         # Читаем первый кадр
         self.frame_ok, self.img_raw = cap.read()
 
-        divergence_list = [0 for i in range(self.frame_count)]
+        # divergence_list = [0 for i in range(self.frame_count)] 
+        divergence_list = np.zeros(self.frame_count) 
+        # print(divergence_list)
 
-        while(True):
+        list_m = None
+
+        while(True):    
             # Читаем новые кадры только если включен плей
             if self.play_state:
                 self.frame_ok, self.img_raw = cap.read()
@@ -185,6 +198,7 @@ class HighlightColor():
 
                         r = (tracker_target - manual_target).module()
                         divergence_list[self.current_frame] = r
+                        list_m = roll(divergence_list, np.zeros(10), 10)
 
                     else:
                         self.tracker_init = self.tracker.init(self.img_result, self.start_bbox)
@@ -201,7 +215,8 @@ class HighlightColor():
             if(fps_control):
                 time.sleep(1 / self.fps)
 
-        print("r = ", divergence_list)
+        print("list_m = ", list_m.shape)
+        print("median = ", np.median(list_m))
         # plt.plot(range(self.frame_count), divergence_list)
         # plt.stem(range(self.frame_count), divergence_list, use_line_collection = True)
         plt.bar(range(self.frame_count), divergence_list)
