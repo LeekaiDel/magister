@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Построить графиг зависимости расхождения от кадра
+Построить график зависимости расхождения от кадра
 """
 
 
@@ -89,20 +89,20 @@ class HighlightColor():
         # States    
         self.frame_ok           = False
         self.tracker_init         = False
-        self.play_state         = False
+        self.play_state         = True
         # Configs
         self.min_th = 0
         self.max_th = 0
 
-        cv2.namedWindow('result')
+        # cv2.namedWindow('result')
         # Создаём в окне result бегунки для задания порогов цвета
-        cv2.createTrackbar('MinTh', 'result', 0, 255, self.min_th_cb)
-        cv2.createTrackbar('MaxTh', 'result', 0, 255, self.max_th_cb)
+        # cv2.createTrackbar('MinTh', 'result', 0, 255, self.min_th_cb)
+        # cv2.createTrackbar('MaxTh', 'result', 0, 255, self.max_th_cb)
 
-        cv2.createButton('Play', self.play_cb)
-        cv2.createButton('Stop', self.stop_cb)
-        cv2.createButton('Set BBox', self.setBboxCb)
-        cv2.createButton('Track', self.track_cb)
+        # cv2.createButton('Play', self.play_cb)
+        # cv2.createButton('Stop', self.stop_cb)
+        # cv2.createButton('Set BBox', self.setBboxCb)
+        # cv2.createButton('Track', self.track_cb)
 
         # Главный цикл
         # cap = cv2.VideoCapture("/dev/video0")    #stereo elp >> /dev/video2, /dev/video4
@@ -185,7 +185,7 @@ class HighlightColor():
                             # p1 = (int(self.start_bbox[0]), int(self.start_bbox[1]))
                             # p2 = (int(self.start_bbox[0] + self.start_bbox[2]), int(self.start_bbox[1] + self.start_bbox[3]))
                             # cv2.rectangle(self.img_result, p1, p2, (255, 0, 0), 2, 1)
-                        else :
+                        else:
                             # Tracking failure
                             cv2.putText(self.img_result, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0, 0, 255), 2)
                             tracker_target.x = 0
@@ -198,7 +198,6 @@ class HighlightColor():
 
                         r = (tracker_target - manual_target).module()
                         divergence_list[self.current_frame] = r
-                        list_m = roll(divergence_list, np.zeros(10), 10)
 
                     else:
                         self.tracker_init = self.tracker.init(self.img_result, self.start_bbox)
@@ -209,17 +208,39 @@ class HighlightColor():
             # print("Duration iter  >>", round(self.iter_duration, 2), "c")
             # print("Percent point  >> ", int((self.current_frame / self.frame_count) * 100), "%", "/", 100, "%" )
             # print("Frame point    >> ", self.current_frame, "/", self.frame_count )
+            print(self.current_frame, "/", self.frame_count)
+            if self.current_frame == (self.frame_count - 1):
+                break
 
             if cv2.waitKey(1) == 27: 
                 break
             if(fps_control):
                 time.sleep(1 / self.fps)
 
-        print("list_m = ", list_m.shape)
-        print("median = ", np.median(list_m))
-        # plt.plot(range(self.frame_count), divergence_list)
+        list_m = roll(divergence_list, np.zeros(25), 1)
+        # print(list_m.shape)
+        median_list = []
+        for line in list_m:
+            median_list.append(np.median(line))
+
+        median_arr = np.array(median_list)
+        print("median_arr: ", median_arr)
+        print("median_arr shape: ", median_arr.shape)
+
+        print("list_m.shape = ", list_m.shape, "list_m = ", list_m)
+        median = np.median(median_arr)
+        where = np.where(median_arr >= median)
+        print("median = ", median)
+        print("np.where = ", where[0][0])
+
         # plt.stem(range(self.frame_count), divergence_list, use_line_collection = True)
-        plt.bar(range(self.frame_count), divergence_list)
+        plt.axhline(y=median, color='r')                    # Медиана красным
+        plt.axvline(x=where[0][0], color='g')
+        # plt.plot(range(self.frame_count), divergence_list, color='b')
+        plt.plot(range(median_arr.shape[0]), median_arr, color='r')
+        # plt.plot(x=where[0][-1], color='r') # Кадр, с которого идет больше порога
+        plt.xlabel('Frame')
+        plt.ylabel('Divergence')
         plt.grid()
         plt.show()
 
