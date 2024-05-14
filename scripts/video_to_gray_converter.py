@@ -1,8 +1,8 @@
 import cv2
 
-origin_filename = "/home/leekai/Workspaces/TP_Videos/a.mp4"
+origin_filename = "/home/leekai/Workspaces/TP_Videos/5.mp4"
 
-target_filename = "../../flying_plane.avi"
+target_filename = "/home/leekai/Workspaces/TP_Videos/5_gray.avi"
 target_width    = 640   # TP: 640
 target_height   = 512   # TP: 512
 target_fps      = 25

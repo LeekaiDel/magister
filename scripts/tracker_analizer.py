@@ -19,7 +19,7 @@ from parser_bbox import getListBboxes
 bb_path = "../marks/tp_drone_x4"                # bb - bounding box
 add_prefix = "frame_"
 # Настройки трекера и трешолда
-index = 6
+index = 0
 trsh = 98                   # trsh - treshold
 # Настройки видео
 fr_width   = 640             # fr - frame
@@ -208,7 +208,7 @@ class HighlightColor():
             # print("Duration iter  >>", round(self.iter_duration, 2), "c")
             # print("Percent point  >> ", int((self.current_frame / self.frame_count) * 100), "%", "/", 100, "%" )
             # print("Frame point    >> ", self.current_frame, "/", self.frame_count )
-            print(self.current_frame, "/", self.frame_count)
+            # print(self.current_frame, "/", self.frame_count)
             if self.current_frame == (self.frame_count - 1):
                 break
 
@@ -229,16 +229,16 @@ class HighlightColor():
 
         print("list_m.shape = ", list_m.shape, "list_m = ", list_m)
         median = np.median(median_arr)
-        where = np.where(median_arr >= median)
-        print("median = ", median)
+        where = np.where(median_arr >= 100) # 
+        print("median = ", median) # 
         print("np.where = ", where[0][0])
 
         # plt.stem(range(self.frame_count), divergence_list, use_line_collection = True)
-        plt.axhline(y=median, color='r')                    # Медиана красным
+        plt.axhline(y=100, color='r')                    # Медиана красным
         plt.axvline(x=where[0][0], color='g')
-        # plt.plot(range(self.frame_count), divergence_list, color='b')
+        plt.plot(range(self.frame_count), divergence_list, color='b')
         plt.plot(range(median_arr.shape[0]), median_arr, color='r')
-        # plt.plot(x=where[0][-1], color='r') # Кадр, с которого идет больше порога
+
         plt.xlabel('Frame')
         plt.ylabel('Divergence')
         plt.grid()
@@ -273,4 +273,6 @@ class HighlightColor():
 
 
 if __name__ == "__main__":
-    HighlightColor()
+    for i in range(7):
+        index = i
+        HighlightColor()
