@@ -20,7 +20,7 @@ bb_path = "../marks/tp_drone_x4"                # bb - bounding box
 add_prefix = "frame_"
 # Настройки трекера и трешолда
 index = 0
-trsh = 98                   # trsh - treshold
+trsh = 90                   # trsh - treshold 98
 # Настройки видео
 fr_width   = 640             # fr - frame
 fr_height  = 512
@@ -164,9 +164,9 @@ class HighlightColor():
                     img_result = cv2.blur(self.img_result, (3, 3))                                          
                     ret, img_result = cv2.threshold(img_result, trsh, 255, cv2.THRESH_BINARY) #self.min_th   // 100, 120, 140 // эталон: 124
                     # Увеличиваем контуры белых объектов (Делаем противоположность функции erode) - делаем две итерации
-                    maskDi = cv2.dilate(img_result, None, iterations=1)
-                    maskEr = cv2.erode(maskDi, None, iterations=1)
-                    self.img_result = cv2.cvtColor(maskEr, cv2.COLOR_GRAY2RGB)  # maskEr
+                    img_result = cv2.erode(img_result, None, iterations=1)
+                    img_result = cv2.dilate(img_result, None, iterations=1)
+                    self.img_result = cv2.cvtColor(img_result, cv2.COLOR_GRAY2RGB)  # maskEr
                 
                     if self.tracker_init:
                         start_t = time.time()
