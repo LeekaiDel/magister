@@ -12,11 +12,15 @@ import os
 import time
 import matplotlib.pyplot as plt
 import math
+from ultralytics import YOLO
 
 from parser_bbox import getListBboxes 
 
 # Путь к вафлам разметки
 bb_path = "../marks/tp_drone_x4"                # bb - bounding box
+# Путь к весам для нейронки
+weights_path = "../weights/best.pt"
+# 
 add_prefix = "frame_"
 # Настройки трекера и трешолда
 index = 0
@@ -24,7 +28,9 @@ trsh = 90                   # trsh - treshold 98
 # Настройки видео
 fr_width   = 640             # fr - frame
 fr_height  = 512
-fps_control = False
+fps_control = True
+# Использовать Ёблочку вместо трекера
+use_yolo = True
 
 class Point2D:
     def __init__(self, x: int = 0, y: int = 0):
@@ -38,14 +44,14 @@ class Point2D:
         return int(math.sqrt(pow(self.x, 2) + pow(self.y, 2))) 
 
 
-def drawTarget(img, target_point: tuple, f_yellow: int):  
+def drawTarget(img, target_point: tuple, color: dict):  
     cv2.ellipse(img, 
             center=target_point, 
             axes=(10, 10),
             angle=0,
             startAngle=0,
             endAngle=360,
-            color=(0, f_yellow * 255, 255),
+            color=color,
             thickness=2)
 
 
@@ -54,7 +60,11 @@ def drawTargetBBox(img, bbox_array, bb_number: int):
         int(fr_width * (bbox_array[bb_number][1])),   #  + bbox_array[bb_number][3] / 2)
         int(fr_height * (bbox_array[bb_number][2]))  # + bbox_array[bb_number][4] / 2)
     )
-    drawTarget(img, (manual_target.x, manual_target.y), 0)
+    drawTarget(img, (manual_target.x, manual_target.y), (255, 0, 0))
+
+    # p1 = (  int(bbox_array[bb_number][0]),                            int(bbox_array[bb_number][1] )                          )
+    # p2 = (  int(bbox_array[bb_number][0] + bbox_array[bb_number][2]), int(bbox_array[bb_number][1] + bbox_array[bb_number][3]))
+    # cv2.rectangle(img, p1, p2, (255, 0, 0), 2, 1)
     return manual_target
     
 
@@ -73,6 +83,7 @@ class HighlightColor():
         
         # Global variables
         self.tracker_type       = self.tracker_types[index]
+        self.model              = None  # Для нейронки
         self.tracker            = None
         self.iter_duration      = -1
         # Params
@@ -85,7 +96,7 @@ class HighlightColor():
         # Imgs
         self.img_raw            = None
         self.img_result         = None
-        self.img_prepared       = None
+        self.img_res_yolo       = None
         # States    
         self.frame_ok           = False
         self.tracker_init         = False
@@ -138,7 +149,7 @@ class HighlightColor():
         self.frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))   # Находим количество кадров во всем файле
         print("Количество кадров в файле: ", self.frame_count)
         self.bbox_arr = getListBboxes(bb_path, self.frame_count, add_prefix)
-        print("Количество баундинбоксов в списке: ", self.bbox_arr.shape[0])
+        print("Количество баудинбоксов в списке: ", self.bbox_arr.shape[0])
 
         # Читаем первый кадр
         self.frame_ok, self.img_raw = cap.read()
@@ -162,10 +173,10 @@ class HighlightColor():
 
                 if self.img_result is not None:
                     img_result = cv2.blur(self.img_result, (3, 3))                                          
-                    ret, img_result = cv2.threshold(img_result, trsh, 255, cv2.THRESH_BINARY) #self.min_th   // 100, 120, 140 // эталон: 124
-                    # Увеличиваем контуры белых объектов (Делаем противоположность функции erode) - делаем две итерации
-                    img_result = cv2.erode(img_result, None, iterations=1)
-                    img_result = cv2.dilate(img_result, None, iterations=1)
+                    # ret, img_result = cv2.threshold(img_result, trsh, 255, cv2.THRESH_BINARY) #self.min_th   // 100, 120, 140 // эталон: 124
+                    # # Увеличиваем контуры белых объектов (Делаем противоположность функции erode) - делаем две итерации
+                    # img_result = cv2.erode(img_result, None, iterations=1)
+                    # img_result = cv2.dilate(img_result, None, iterations=1)
                     self.img_result = cv2.cvtColor(img_result, cv2.COLOR_GRAY2RGB)  # maskEr
                 
                     if self.tracker_init:
@@ -180,11 +191,11 @@ class HighlightColor():
                             tracker_target.y = int(self.start_bbox[1]) + int(self.start_bbox[3] // 2)
 
                             # Рисуем таргет от трекера
-                            drawTarget(self.img_result, (tracker_target.x, tracker_target.y), 1)
+                            drawTarget(self.img_result, (tracker_target.x, tracker_target.y), (0, 0, 255))
 
                             # p1 = (int(self.start_bbox[0]), int(self.start_bbox[1]))
                             # p2 = (int(self.start_bbox[0] + self.start_bbox[2]), int(self.start_bbox[1] + self.start_bbox[3]))
-                            # cv2.rectangle(self.img_result, p1, p2, (255, 0, 0), 2, 1)
+                            # cv2.rectangle(self.img_result, p1, p2, (0, 0, 255), 2, 1)
                         else:
                             # Tracking failure
                             cv2.putText(self.img_result, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0, 0, 255), 2)
@@ -199,11 +210,54 @@ class HighlightColor():
                         r = (tracker_target - manual_target).module()
                         divergence_list[self.current_frame] = r
 
+                    elif self.model is not None:
+                        results = self.model.predict(self.img_result)
+                        boxes = results[0].boxes.xyxy.tolist()
+                        self.img_res_yolo = results[0].plot()
+
+                        print(boxes)
+
+                        tracker_target = Point2D(0, 0)
+                        if results and self.img_res_yolo is not None and boxes:
+                            # Tracking success
+                            tracker_target.x = int(boxes[0][0] + boxes[0][2]) / 2
+                            tracker_target.y = int(boxes[0][1] + boxes[0][3]) / 2
+                            
+                            # print(tracker_target.x, tracker_target.y)
+
+                            # Рисуем таргет от трекера
+                            drawTarget(self.img_res_yolo, (int(tracker_target.x), int(tracker_target.y)), (0, 0, 255))
+
+                            # p1 = (int(self.start_bbox[0]), int(self.start_bbox[1]))
+                            # p2 = (int(self.start_bbox[0] + self.start_bbox[2]), int(self.start_bbox[1] + self.start_bbox[3]))
+                            # cv2.rectangle(self.img_result, p1, p2, (0, 0, 255), 2, 1)
+                        # else:
+                        #     # Tracking failure
+                        #     # cv2.putText(self.img_result, "YOLO Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0, 0, 255), 2)
+                        #     tracker_target.x = 0
+                        #     tracker_target.y = 0
+
+                        # Рисуем таргет по разметке
+                        manual_target = Point2D(0, 0)
+                        if(self.current_frame < self.bbox_arr.shape[0]):
+                            manual_target = drawTargetBBox(self.img_res_yolo, self.bbox_arr, self.current_frame)  
+
+                        r = (tracker_target - manual_target).module()
+                        divergence_list[self.current_frame] = r
+
+
                     else:
-                        self.tracker_init = self.tracker.init(self.img_result, self.start_bbox)
+                        if not use_yolo:
+                            self.tracker_init = self.tracker.init(self.img_result, self.start_bbox)
+                        else:
+                            self.model = YOLO(weights_path)
 
-                    cv2.imshow('result', self.img_result)
-
+                    if not use_yolo:
+                        cv2.imshow('Res Tracker', self.img_result)
+                    else:
+                        if self.img_res_yolo is not None:
+                            cv2.imshow('Res Yolo', self.img_res_yolo)
+                    
             # os.system("clear    ")
             # print("Duration iter  >>", round(self.iter_duration, 2), "c")
             # print("Percent point  >> ", int((self.current_frame / self.frame_count) * 100), "%", "/", 100, "%" )
@@ -234,13 +288,15 @@ class HighlightColor():
         print("np.where = ", where[0][0])
 
         # plt.stem(range(self.frame_count), divergence_list, use_line_collection = True)
-        plt.axhline(y=100, color='r')                    # Медиана красным
+        plt.axhline(y=100, color='b')                    # Медиана красным
         plt.axvline(x=where[0][0], color='g')
-        plt.plot(range(self.frame_count), divergence_list, color='b')
+        plt.plot(range(self.frame_count), divergence_list, color='c')
         plt.plot(range(median_arr.shape[0]), median_arr, color='r')
 
         plt.xlabel('Frame')
         plt.ylabel('Divergence')
+        
+        plt.legend(["Порог", "Момент превышения","График расхождений", "Фильт. расхождения по медиане"])
         plt.grid()
         plt.show()
 
@@ -273,6 +329,9 @@ class HighlightColor():
 
 
 if __name__ == "__main__":
-    for i in range(7):
-        index = i
+    if not use_yolo:
+        for i in range(7):
+            index = i
+            HighlightColor()
+    else:
         HighlightColor()
